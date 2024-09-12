@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generated Timetable</title>
+</head>
+<body>
+    <h1>Timetable</h1>
+    {% for day, periods in timetable.items %}
+        <h2>{{ day }}</h2>
+        <table border="1">
+            <tr>
+                <th>Period</th>
+                {% for period in periods %}
+                    <th>{{ period }}</th>
+                {% endfor %}
+            </tr>
+            {% for cls, details in periods.items %}
+                <tr>
+                    <td>{{ cls }}</td>
+                    {% for period, data in details.items %}
+                        <td>{{ data.subject }} by {{ data.teacher }}</td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </table>
+    {% endfor %}
+</body>
+</html>

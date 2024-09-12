@@ -1,0 +1,41 @@
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Timetable</title>
+</head>
+<body>
+    <h1>hello</h1>
+    {% for cls, schedule in timetable.items %}
+        <h2>Class: {{ cls.name }}</h2>
+        <table border="1">
+            <thead>
+                <tr>
+                    <th>Day</th>
+                    {% for period in period_range %}
+                        <th>Period {{ period }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for day in days %}
+                    <tr>
+                        <td>{{ day }}</td>
+                        {% for period in schedule|get_item:day %}
+                            <td>
+                                {% if period %}
+                                    {{ period.subject }}<br>
+                                    (Teacher: {{ period.teacher }})
+                                {% else %}
+                                    Free
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endfor %}
+</body>
+</html>
