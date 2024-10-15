@@ -1,0 +1,104 @@
+{% load custom_filters %}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Timetable</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        table, th, td {
+            border: 1px solid black;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+<h2>Timetable</h2>
+
+<!-- Dropdown for teacher filtering -->
+<label for="teacherFilter">Filter by Teacher:</label>
+<select id="teacherFilter">
+    <option value="all">All Teachers</option>
+    {% for teacher in teachers %}
+        <option value="{{ teacher.id }}">{{ teacher.name }}</option>
+    {% endfor %}
+</select>
+
+{% for cls, days_data in timetable_data.items %}
+    <h3>Class: {{ cls.name }}</h3>
+    <table class="timetable">
+        <thead>
+            <tr>
+                <th>Day/Period</th>
+                {% for period in periods %}
+                    <th>Period {{ period }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for day in days %}
+                <tr>
+                    <td>{{ day }}</td>
+                    {% for period in periods %}
+                        <td class="entry" data-teacher-id="{% with days_data|get_item:day|get_item:period as entry %}{% if entry %}{{ entry.teacher.id }}{% else %}none{% endif %}{% endwith %}">
+                            {% with days_data|get_item:day|get_item:period as entry %}
+                                {% if entry %}
+                                    {{ entry.subject.name }}<br>
+                                    (Teacher: {{ entry.teacher.name }})
+                                {% else %}
+                                    Free
+                                {% endif %}
+                            {% endwith %}
+                        </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endfor %}
+
+<!-- Add JavaScript for filtering -->
+<script>
+    document.getElementById('teacherFilter').addEventListener('change', function() {
+        const selectedTeacherId = this.value;
+        const tables = document.querySelectorAll('.timetable');
+
+        tables.forEach(table => {
+            const rows = table.querySelectorAll('tbody tr');
+
+            rows.forEach(row => {
+                const entries = row.querySelectorAll('.entry');
+
+                entries.forEach(entry => {
+                    const teacherId = entry.getAttribute('data-teacher-id');
+
+                    // Check if the entry is associated with the selected teacher
+                    if (selectedTeacherId === "all" || teacherId === selectedTeacherId) {
+                        entry.style.display = ''; // Show the entry if it matches the selected teacher
+                    } else {
+                        entry.style.display = 'none'; // Hide the entry if it does not match
+                    }
+                });
+
+                // If no entries are visible in the row, hide the row itself
+                const visibleEntries = Array.from(entries).some(entry => entry.style.display !== 'none');
+                row.style.display = visibleEntries ? '' : 'none';
+            });
+        });
+    });
+</script>
+
+
+
+</body>
+</html>

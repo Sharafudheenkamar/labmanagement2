@@ -14,4 +14,8 @@ admin.site.register(Teacher1)
 admin.site.register(Subject1)
 admin.site.register(TimetableEntry1)
 admin.site.register(Class1)
+admin.site.register(Auditorium)
+admin.site.register(WorkingDay)
+admin.site.register(TimeSlot)
+admin.site.register(Booking)
 

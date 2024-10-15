@@ -4,6 +4,7 @@ from django.db.models import Count
 from .models import Class1, Subject1, TimetableEntry1
 import random
 from random import shuffle
+from django.views import View
 def generate_timetable(request):
     # Get all classes
     classes = Class1.objects.all()
@@ -349,3 +350,359 @@ def timetable_view(request):
     }
     
     return render(request, 'view_timetable.html', context)
+
+class TimetableView1(View):
+    template_name = 'view_timetable1.html'  # Specify your template name here
+
+    def get(self, request, *args, **kwargs):
+        # Get all classes
+        classes = Class1.objects.all()
+        teachers= Teacher1.objects.all()
+        
+        # Define the days and periods
+        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+        periods = [1, 2, 3, 4, 5]  # Assuming 5 periods per day
+
+        # Initialize a dictionary to hold timetable data
+        timetable_data = {cls: {day: {period: None for period in periods} for day in days} for cls in classes}
+
+        # Populate the timetable dictionary with entries
+        entries = TimetableEntry1.objects.all()
+        for entry in entries:
+            timetable_data[entry.cls][entry.day][entry.period] = entry
+
+        # Create a context dictionary for the template
+        context = {
+            'timetable_data': timetable_data,
+            'days': days,
+            'periods': periods,
+            'teachers':teachers
+        }
+        
+        return render(request, self.template_name, context)
+from django.shortcuts import render, redirect
+from django.views import View
+from .models import Teacher1, Subject1, Class1
+
+# Insert Teacher
+
+class InsertTeacherView(View):
+        def get(self,request):
+            subjects = Subject1.objects.all() 
+            teachers = Teacher1.objects.all()   # Fetch all subjects for the dropdown
+            return render(request, 'insert_data.html', {'subjects': subjects,'teachers':teachers})
+
+        def post(self, request):
+            teacher_name = request.POST.get('teacher_name')
+            if teacher_name:
+                Teacher1.objects.create(name=teacher_name)
+            return redirect('insert_teacher')
+
+
+# Insert Subject
+class InsertSubjectView(View):
+    def get(self, request):
+        subjects = Subject1.objects.all() 
+        teachers = Teacher1.objects.all()   # Fetch all subjects for the dropdown
+        return render(request, 'insert_data.html', {'subjects': subjects,'teachers':teachers})
+
+    def post(self, request):
+        subject_name = request.POST.get('subject_name')
+        contact_hours = request.POST.get('contact_hours')
+        teacher_id = request.POST.get('teacher')
+        teacher = Teacher1.objects.get(id=teacher_id)
+
+        if subject_name and contact_hours and teacher:
+            Subject1.objects.create(name=subject_name, contact_hours=contact_hours, teacher=teacher)
+        return redirect('insert_subject')
+
+
+# Insert Class
+class InsertClassView(View):
+    def get(self, request):
+        subjects = Subject1.objects.all() 
+        teachers = Teacher1.objects.all()   # Fetch all subjects for the dropdown
+        return render(request, 'insert_data.html', {'subjects': subjects})
+
+    def post(self, request):
+        class_name = request.POST.get('class_name')
+        subject_ids = request.POST.getlist('subjects')  # Get multiple subjects
+        if class_name and subject_ids:
+            class_instance = Class1.objects.create(name=class_name)
+            subjects = Subject1.objects.filter(id__in=subject_ids)
+            class_instance.subjects.set(subjects)
+            class_instance.save()
+        return redirect('insert_class')
+
+from django.urls import reverse_lazy
+from django.views.generic import UpdateView
+from django.shortcuts import render
+from .models import Teacher1, Subject1, Class1
+
+class Viewclass_subject_teachers(View):
+    def get(self,request):
+        subjects = Subject1.objects.all() 
+        teachers = Teacher1.objects.all() 
+        classes= Class1.objects.all() 
+        return render(request,'edit_data.html',{'subjects': subjects,'teachers':teachers,'classes':classes})
+
+class EditTeacherView(UpdateView):
+    model = Teacher1
+    template_name = 'edit_teacher.html'
+    fields = ['name']
+    success_url = reverse_lazy('view_data')  # Redirect to the list view after successful edit
+
+class EditSubjectView(UpdateView):
+    model = Subject1
+    template_name = 'edit_subject.html'
+    fields = ['name', 'contact_hours', 'teacher']
+    success_url = reverse_lazy('view_data')  # Redirect to the list view after successful edit
+
+class EditClassView(UpdateView):
+    model = Class1
+    template_name = 'edit_class.html'
+    fields = ['name', 'subjects']
+    success_url = reverse_lazy('view_data')  # Redirect to the list view after successful edit
+
+# Optional: Render the list view in case you want to have a separate view for viewing data
+def view_data(request):
+    teachers = Teacher1.objects.all()
+    subjects = Subject1.objects.all()
+    classes = Class1.objects.all()
+    return render(request, 'view_data.html', {
+        'teachers': teachers,
+        'subjects': subjects,
+        'classes': classes
+    })
+from datetime import datetime, timedelta
+
+def generate_time_slots(start_time, end_time, slot_duration_minutes=60):
+    """
+    Generates time slots for a given start and end time.
+    """
+    start_time_obj = datetime.combine(datetime.today(), start_time)
+    end_time_obj = datetime.combine(datetime.today(), end_time)
+    
+    time_slots = []
+    while start_time_obj + timedelta(minutes=slot_duration_minutes) <= end_time_obj:
+        slot_end_time = start_time_obj + timedelta(minutes=slot_duration_minutes)
+        time_slots.append((start_time_obj.time(), slot_end_time.time()))
+        start_time_obj = slot_end_time
+
+    return time_slots
+from django.shortcuts import render, get_object_or_404
+from django.views import View
+from django.utils import timezone
+from calendar import monthrange
+from datetime import timedelta, date
+
+from .models import Auditorium, TimeSlot, Booking, WorkingDay
+
+
+from django.utils import timezone
+from django.views import View
+from django.shortcuts import get_object_or_404, render
+from datetime import date, timedelta
+from calendar import monthrange
+from django.shortcuts import render, get_object_or_404, redirect
+from django.views import View
+from django.utils import timezone
+from calendar import monthrange
+from datetime import date, timedelta
+from .models import Auditorium, Booking, TimeSlot
+
+class AuditoriumBookingView(View):
+    def get(self, request, auditorium_id):
+            auditorium = get_object_or_404(Auditorium, id=auditorium_id)
+
+            # Get the current date or use a provided date
+            today = timezone.now().date()
+            selected_year = int(request.GET.get('year', today.year))
+            selected_month = int(request.GET.get('month', today.month))
+
+            selected_date = date(selected_year, selected_month, 1)
+            num_days_in_month = monthrange(selected_date.year, selected_date.month)[1]
+
+            first_day_weekday = selected_date.weekday()  # Monday is 0, Sunday is 6
+
+            # Fetch bookings for the selected month
+            first_day = selected_date
+            last_day = selected_date + timedelta(days=num_days_in_month - 1)
+            bookings = Booking.objects.filter(auditorium=auditorium, date__range=[first_day, last_day])
+
+            # Create a dictionary of bookings per day
+            bookings_by_date = {day: [] for day in range(1, num_days_in_month + 1)}
+            for booking in bookings:
+                day = booking.date.day
+                bookings_by_date[day].append(booking.time_slot)
+
+            calendar_days = []
+            for day in range(1, num_days_in_month + 1):
+                current_date = date(selected_date.year, selected_date.month, day)
+                day_name = current_date.strftime('%A')  # Get day name like 'Monday', 'Tuesday'
+                
+                # Fetch the working day for this specific day of the week
+                working_day = WorkingDay.objects.filter(auditorium=auditorium, day=day_name).first()
+                # print("working_day",working_day)
+                slots_with_status = []
+
+                if working_day:
+                    # Fetch only time slots that belong to this working day
+                    time_slots = TimeSlot.objects.filter(working_day=working_day)
+                    day_bookings = bookings_by_date.get(day, [])
+                    print("time_slots",time_slots)
+                    for slot in time_slots:
+                        is_booked = any(booking == slot for booking in day_bookings)
+                        slots_with_status.append({
+                            'slot': slot,
+                            'status': 'occupied' if is_booked else 'vacant'
+                        })
+
+                calendar_days.append({
+                    'date': current_date,
+                    'slots_with_status': slots_with_status
+                })
+
+            # Add the range of empty days before the first day of the month
+            empty_days_before_first = list(range(first_day_weekday))
+
+            context = {
+                'auditorium': auditorium,
+                'calendar_days': calendar_days,
+                'selected_date': selected_date,
+                'selected_year': selected_year,
+                'selected_month': selected_month,
+                'first_day_weekday': first_day_weekday,
+                'empty_days_before_first': empty_days_before_first,
+            }
+            # print(calendar_days)
+
+            return render(request, 'auditorium_booking.html', context)
+    def post(self, request, auditorium_id):
+        # Handle booking when the user selects a time slot
+        auditorium = get_object_or_404(Auditorium, id=auditorium_id)
+        user = request.user
+        slot_id = request.POST.get('slot_id')
+        selected_date = request.POST.get('selected_date')
+        purpose=request.POST.get('purpose')
+    
+
+        if slot_id and selected_date:
+            time_slot = get_object_or_404(TimeSlot, id=slot_id)
+            booking_date = datetime.strptime(selected_date, '%b. %d, %Y').date()
+            # booking_date = date.fromisoformat(selected_date)
+
+            # Check if the time slot is already booked
+            if not Booking.objects.filter(auditorium=auditorium, date=booking_date, time_slot=time_slot).exists():
+                Booking.objects.create(
+                    auditorium=auditorium,
+                    user=user,
+                    date=booking_date,
+                    time_slot=time_slot,
+                    purpose=purpose
+                )
+        return self.get(request, auditorium_id)
+
+class BookingConfirmationView(View):
+    def get(self, request, booking_id):
+        booking = get_object_or_404(Booking, id=booking_id)
+        context = {'booking': booking}
+        return render(request, 'booking_confirmation.html', context)
+    
+from django.views import View
+from django.shortcuts import get_object_or_404, redirect, render
+from .models import Booking
+from .forms import BookingForm
+
+class EditBookingView(View):
+    def get(self, request, booking_id):
+        booking = get_object_or_404(Booking, id=booking_id)
+        form = BookingForm(instance=booking)
+        return render(request, 'edit_booking.html', {'form': form, 'booking': booking})
+
+    def post(self, request, booking_id):
+        booking = get_object_or_404(Booking, id=booking_id)
+        form = BookingForm(request.POST, instance=booking)
+        if form.is_valid():
+            form.save()
+            return redirect('auditorium_booking', auditorium_id=booking.auditorium.id)
+        return render(request, 'edit_booking.html', {'form': form, 'booking': booking})
+from django.views import View
+from django.shortcuts import get_object_or_404, redirect, render
+from .models import Booking
+
+class DeleteBookingView(View):
+    def get(self, request, booking_id):
+        booking = get_object_or_404(Booking, id=booking_id)
+        return render(request, 'delete_confirmation.html', {'booking': booking})
+
+    def post(self, request, booking_id):
+        booking = get_object_or_404(Booking, id=booking_id)
+        booking.delete()
+        return redirect('adminauditorium_booking', auditorium_id=booking.auditorium.id)
+class AdminAuditoriumBookingView(View):
+    def get(self, request, auditorium_id):
+        auditorium = get_object_or_404(Auditorium, id=auditorium_id)
+
+        # Get the current date or use a provided date
+        today = timezone.now().date()
+        selected_year = int(request.GET.get('year', today.year))
+        selected_month = int(request.GET.get('month', today.month))
+
+        selected_date = date(selected_year, selected_month, 1)
+        num_days_in_month = monthrange(selected_date.year, selected_date.month)[1]
+
+        first_day_weekday = selected_date.weekday()  # Monday is 0, Sunday is 6
+
+        # Fetch bookings for the selected month
+        first_day = selected_date
+        last_day = selected_date + timedelta(days=num_days_in_month - 1)
+        bookings = Booking.objects.filter(auditorium=auditorium, date__range=[first_day, last_day])
+
+        # Create a dictionary of bookings per day
+        bookings_by_date = {day: [] for day in range(1, num_days_in_month + 1)}
+        for booking in bookings:
+            day = booking.date.day
+            bookings_by_date[day].append(booking)
+
+        calendar_days = []
+        for day in range(1, num_days_in_month + 1):
+            current_date = date(selected_date.year, selected_date.month, day)
+            day_name = current_date.strftime('%A')  # Get day name like 'Monday', 'Tuesday'
+
+            # Fetch the working day for this specific day of the week
+            working_day = WorkingDay.objects.filter(auditorium=auditorium, day=day_name).first()
+            slots_with_status = []
+
+            if working_day:
+                # Fetch only time slots that belong to this working day
+                time_slots = TimeSlot.objects.filter(working_day=working_day)
+                day_bookings = bookings_by_date.get(day, [])
+                for slot in time_slots:
+                    # Check if the slot is booked
+                    booked_slot = next((b for b in day_bookings if b.time_slot == slot), None)
+                    slots_with_status.append({
+                        'slot': slot,
+                        'status': 'occupied' if booked_slot else 'vacant',
+                        'booking': booked_slot,  # Pass the booking object if it's occupied
+                    })
+
+            calendar_days.append({
+                'date': current_date,
+                'slots_with_status': slots_with_status
+            })
+
+        empty_days_before_first = list(range(first_day_weekday))
+
+        context = {
+            'auditorium': auditorium,
+            'calendar_days': calendar_days,
+            'selected_date': selected_date,
+            'selected_year': selected_year,
+            'selected_month': selected_month,
+            'first_day_weekday': first_day_weekday,
+            'empty_days_before_first': empty_days_before_first,
+        }
+
+        return render(request, 'edit_auditorium_booking.html', context)
+
